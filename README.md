@@ -4,22 +4,26 @@ A Python-based web crawler for extracting player market data from Futbin.com pla
 
 **✅ WORKING VERSION: Successfully extracts data for multiple players using JSON configuration**
 
-## 🚀 Latest Test Results
+## 🚀 Latest Features
 
-Successfully extracted data for:
-- **Melchie Dumornay**: Cheapest 54,000 | Avg BIN 60,556 | EA Avg 65,000
-- **Cristiano Ronaldo**: Cheapest 9,800 | Avg BIN 12,289 | EA Avg 13,125
+✅ **Google Sheets Integration** - Automatically push data to Google Sheets every 30 seconds!
+
+Successfully tested with real-time data extraction:
+- **Melchie Dumornay**: Cheapest 54,000 | Avg BIN 60,787 | EA Avg 65,000
+- **Cristiano Ronaldo**: Cheapest 10,500 | Avg BIN 12,466 | EA Avg 12,500
+- **Alexander Isak**: Cheapest 479,000 | Avg BIN 479,000 | EA Avg 150,000
 
 ## Features
 
 ### Core Capabilities
 - **Multi-player support** via JSON configuration
 - **Player management system** with interactive interface
+- **Google Sheets integration** - Real-time data push every 30 seconds
 - **Automatic data extraction** for:
   - Cheapest Sale price
   - Average BIN (Buy It Now) price
   - EA Average price
-- **CSV export** for spreadsheet integration
+- **CSV export** for local spreadsheet analysis
 - **JSON export** for API integration
 - **Configurable settings** (delays, headless mode, etc.)
 - **Cross-platform support** (Windows, Linux, macOS)
@@ -193,6 +197,86 @@ This will:
      EA Avg: 13,125
 ```
 
+## 🔗 Google Sheets Integration
+
+### Automatic Real-Time Data Push
+
+The crawler can automatically push data to Google Sheets every 30 seconds, building a complete price history for analysis.
+
+### Quick Setup
+
+1. **Set up Google Cloud API** (see detailed walkthrough below)
+2. **Download credentials** and save as `credentials.json` 
+3. **Share your Google Sheet** with the service account email
+4. **Run the connector**:
+```bash
+python google_sheets_connector.py YOUR_SPREADSHEET_ID
+```
+
+### Complete Google Cloud Setup Walkthrough
+
+#### Step 1: Access Google Cloud Console
+1. Go to https://console.cloud.google.com/
+2. Sign in with your Google account
+
+#### Step 2: Create a Project
+1. Click the project dropdown at the top
+2. Click "NEW PROJECT"
+3. Name it `futbin-crawler`
+4. Click "CREATE"
+
+#### Step 3: Enable Google Sheets API
+1. In the search bar, type "Google Sheets API"
+2. Click on it from results
+3. Click the blue "ENABLE" button
+
+#### Step 4: Create Service Account
+1. Go to "APIs & Services" → "Credentials"
+2. Click "+ CREATE CREDENTIALS" → "Service account"
+3. Name: `futbin-crawler-bot`
+4. Click "CREATE AND CONTINUE"
+5. Skip optional roles (click "CONTINUE")
+6. Click "DONE"
+
+#### Step 5: Generate JSON Key
+1. Click on your service account email
+2. Go to "KEYS" tab
+3. Click "ADD KEY" → "Create new key"
+4. Choose "JSON" format
+5. Click "CREATE"
+6. Save downloaded file as `credentials.json` in futbin-crawler folder
+
+#### Step 6: Share Your Google Sheet
+1. Copy the service account email (ends with @...iam.gserviceaccount.com)
+2. Open your Google Sheet
+3. Click "Share"
+4. Paste the service account email
+5. Set permission to "Editor"
+6. Uncheck "Notify people"
+7. Click "Share"
+
+#### Step 7: Get Spreadsheet ID
+From your Google Sheets URL:
+```
+https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit
+```
+Copy the `YOUR_SPREADSHEET_ID` part.
+
+#### Step 8: Run the Connector
+```bash
+python google_sheets_connector.py YOUR_SPREADSHEET_ID
+```
+
+The crawler will now push data to your Google Sheet every 30 seconds!
+
+### Google Sheets Data Format
+
+| Timestamp | Player Name | Cheapest Sale | Average BIN | EA Avg Price | Notes | URL |
+|-----------|------------|---------------|-------------|--------------|-------|-----|
+| 2025-09-26 15:41:00 | Melchie Dumornay | 54000 | 60787 | 65000 | Gold Rare | https://... |
+| 2025-09-26 15:41:00 | Ronaldo | 10500 | 12466 | 12500 | | https://... |
+| 2025-09-26 15:41:00 | Isak | 479000 | 479000 | 150000 | | https://... |
+
 ## API Reference
 
 ### FutbinCrawler Class
@@ -224,10 +308,17 @@ Closes the Selenium driver and cleans up resources.
 
 ### Main Files
 - `crawler_with_config.py` - Main crawler using JSON configuration
+- `google_sheets_connector.py` - Google Sheets real-time integration
 - `player_links.json` - Configuration file for player URLs and settings
 - `manage_players.py` - Interactive player management utility
 - `futbin_crawler_working.py` - Core crawler engine
 - `spreadsheet_integration_example.py` - CSV/spreadsheet integration examples
+
+### Configuration Files
+- `credentials.json` - Google service account credentials (DO NOT COMMIT TO GIT!)
+- `.gitignore` - Git ignore rules (includes credentials protection)
+- `requirements.txt` - Python dependencies including Google APIs
+- `GOOGLE_SHEETS_SETUP.md` - Detailed Google Sheets setup guide
 
 ### Output Files
 - `futbin_prices.csv` - Price data in CSV format

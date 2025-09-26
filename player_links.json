@@ -23,6 +23,7 @@
     "delay_between_requests": 3,
     "headless_mode": false,
     "save_to_csv": true,
-    "csv_filename": "futbin_prices.csv"
+    "csv_filename": "futbin_prices.csv",
+    "google_spreadsheet_id": "YOUR_SPREADSHEET_ID_HERE"
   }
 }

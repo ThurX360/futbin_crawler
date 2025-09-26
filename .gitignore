@@ -87,11 +87,14 @@ debug_page.html
 # *.json
 # !requirements.txt  # But keep requirements.txt
 
-# Credentials and secrets
+# Credentials and secrets (NEVER commit these!)
 credentials.json
+credentials.json.json
 token.json
 *.key
 *.pem
+*-credentials.json
+service-account-*.json
 
 # Temporary files
 *.tmp
