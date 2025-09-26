@@ -11,6 +11,12 @@
       "url": "https://www.futbin.com/26/player/724/cristiano-ronaldo-dos-santos-aveiro/market",
       "enabled": true,
       "notes": ""
+    },
+    {
+      "name": "Isak",
+      "url": "https://www.futbin.com/26/player/52/alexander-isak/market",
+      "enabled": true,
+      "notes": ""
     }
   ],
   "settings": {

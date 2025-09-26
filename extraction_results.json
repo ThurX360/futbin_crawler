@@ -4,10 +4,10 @@
     "url": "https://www.futbin.com/26/player/257/melchie-dumornay/market",
     "data": {
       "cheapest_sale": 54000,
-      "actual_price": 60556,
+      "actual_price": 60630,
       "average_price": 65000,
       "player_name": "Melchie Dumornay",
-      "timestamp": "2025-09-26 15:02:43",
+      "timestamp": "2025-09-26 15:15:40",
       "notes": "Gold Rare - EA FC 26"
     }
   },
@@ -15,11 +15,23 @@
     "success": true,
     "url": "https://www.futbin.com/26/player/724/cristiano-ronaldo-dos-santos-aveiro/market",
     "data": {
-      "cheapest_sale": 9800,
-      "actual_price": 12289,
-      "average_price": 13125,
+      "cheapest_sale": 10500,
+      "actual_price": 12371,
+      "average_price": 11750,
       "player_name": "Ronaldo",
-      "timestamp": "2025-09-26 15:02:53",
+      "timestamp": "2025-09-26 15:15:51",
+      "notes": ""
+    }
+  },
+  {
+    "success": true,
+    "url": "https://www.futbin.com/26/player/52/alexander-isak/market",
+    "data": {
+      "cheapest_sale": 479000,
+      "actual_price": 479000,
+      "average_price": 166000,
+      "player_name": "Isak",
+      "timestamp": "2025-09-26 15:16:01",
       "notes": ""
     }
   }

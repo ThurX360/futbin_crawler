@@ -171,7 +171,7 @@ class ConfiguredFutbinCrawler:
         ]
         
         # Write to CSV
-        with open(filename, 'a' if file_exists else 'w', newline='', encoding='utf-8') as f:
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=headers)
             
             # Write header if new file
