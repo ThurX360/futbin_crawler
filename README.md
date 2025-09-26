@@ -6,7 +6,10 @@ A Python-based web crawler for extracting player market data from Futbin.com pla
 
 ## 🚀 Latest Features
 
-✅ **Google Sheets Integration** - Automatically push data to Google Sheets every 30 seconds!
+✅ **Google Sheets Integration V2** - Manage players directly in Google Sheets!
+- **Read players from Google Sheets** - No more JSON editing!
+- **Auto-sync every 30 seconds** - Changes take effect automatically
+- **Enable/disable players** - Control tracking from spreadsheet
 
 Successfully tested with real-time data extraction:
 - **Melchie Dumornay**: Cheapest 54,000 | Avg BIN 60,787 | EA Avg 65,000
@@ -203,15 +206,23 @@ This will:
 
 The crawler can automatically push data to Google Sheets every 30 seconds, building a complete price history for analysis.
 
-### Quick Setup
+### Quick Setup (Two Versions Available)
 
+#### Version 2 - Manage Players in Google Sheets (Recommended)
 1. **Set up Google Cloud API** (see detailed walkthrough below)
-2. **Download credentials** and save as `credentials.json` 
+2. **Download credentials** and save as `credentials.json`
 3. **Share your Google Sheet** with the service account email
-4. **Run the connector**:
+4. **Run the V2 connector**:
+```bash
+python google_sheets_connector_v2.py YOUR_SPREADSHEET_ID
+```
+5. **Add players** in the "Players" sheet of your Google Spreadsheet
+
+#### Version 1 - Using JSON Configuration
 ```bash
 python google_sheets_connector.py YOUR_SPREADSHEET_ID
 ```
+(Reads players from player_links.json)
 
 ### Complete Google Cloud Setup Walkthrough
 
@@ -307,18 +318,20 @@ Closes the Selenium driver and cleans up resources.
 ## 📁 Project Files
 
 ### Main Files
+- `google_sheets_connector_v2.py` - Google Sheets integration V2 (reads players from sheets)
+- `google_sheets_connector.py` - Google Sheets integration V1 (reads from JSON)
 - `crawler_with_config.py` - Main crawler using JSON configuration
-- `google_sheets_connector.py` - Google Sheets real-time integration
 - `player_links.json` - Configuration file for player URLs and settings
 - `manage_players.py` - Interactive player management utility
 - `futbin_crawler_working.py` - Core crawler engine
 - `spreadsheet_integration_example.py` - CSV/spreadsheet integration examples
 
-### Configuration Files
+### Configuration & Documentation
 - `credentials.json` - Google service account credentials (DO NOT COMMIT TO GIT!)
 - `.gitignore` - Git ignore rules (includes credentials protection)
 - `requirements.txt` - Python dependencies including Google APIs
 - `GOOGLE_SHEETS_SETUP.md` - Detailed Google Sheets setup guide
+- `GOOGLE_SHEETS_PLAYERS_GUIDE.md` - Guide for managing players in Google Sheets
 
 ### Output Files
 - `futbin_prices.csv` - Price data in CSV format
