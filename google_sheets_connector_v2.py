@@ -316,6 +316,78 @@ class GoogleSheetsConnectorV2:
         
         return results
     
+    def _update_dropdown_validation(self, column_letter: str, new_values: List[str]):
+        """Update dropdown validation for a specific column with new values"""
+        try:
+            # Get the sheet ID
+            sheet_id = self._get_sheet_id(self.data_sheet)
+            
+            # Get column index (A=0, B=1, etc.)
+            column_index = ord(column_letter.upper()) - ord('A')
+            
+            # Get existing validation values
+            existing_values = self._get_dropdown_values(column_letter)
+            
+            # Combine and deduplicate values
+            all_values = list(set(existing_values + new_values))
+            all_values.sort()  # Sort for better organization
+            
+            if len(all_values) == len(existing_values):
+                return  # No new values to add
+            
+            # Create validation rule
+            validation_rule = {
+                'setDataValidation': {
+                    'range': {
+                        'sheetId': sheet_id,
+                        'startRowIndex': 1,  # Start from row 2 (skip header)
+                        'startColumnIndex': column_index,
+                        'endColumnIndex': column_index + 1
+                    },
+                    'rule': {
+                        'condition': {
+                            'type': 'ONE_OF_LIST',
+                            'values': [{'userEnteredValue': value} for value in all_values]
+                        },
+                        'showCustomUi': True,
+                        'strict': False  # Allow other values temporarily
+                    }
+                }
+            }
+            
+            # Apply the validation rule
+            self.service.spreadsheets().batchUpdate(
+                spreadsheetId=self.spreadsheet_id,
+                body={'requests': [validation_rule]}
+            ).execute()
+            
+            logger.info(f"✅ Updated dropdown for column {column_letter} with {len(new_values)} new values")
+            
+        except Exception as e:
+            logger.warning(f"Could not update dropdown validation: {e}")
+    
+    def _get_dropdown_values(self, column_letter: str) -> List[str]:
+        """Get existing dropdown values from a column"""
+        try:
+            # Read all values from the column (excluding header)
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f'{self.data_sheet}!{column_letter}2:{column_letter}'
+            ).execute()
+            
+            values = result.get('values', [])
+            unique_values = set()
+            
+            for row in values:
+                if row and row[0]:
+                    unique_values.add(str(row[0]))
+            
+            return list(unique_values)
+            
+        except Exception as e:
+            logger.warning(f"Could not get existing dropdown values: {e}")
+            return []
+    
     def push_to_sheets(self, data: List[Dict]):
         """Push extracted data to the data sheet"""
         if not data:
@@ -323,6 +395,16 @@ class GoogleSheetsConnectorV2:
             return
         
         try:
+            # Extract unique player names and rarities
+            unique_player_names = list(set(item['player_name'] for item in data if item['player_name']))
+            unique_rarities = list(set(item['rarity'] for item in data if item.get('rarity')))
+            
+            # Update dropdown validations for Player Name (column B) and Rarity (column F)
+            if unique_player_names:
+                self._update_dropdown_validation('B', unique_player_names)
+            if unique_rarities:
+                self._update_dropdown_validation('F', unique_rarities)
+            
             # Convert data to rows
             rows = []
             for item in data:
