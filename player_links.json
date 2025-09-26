@@ -1,0 +1,22 @@
+{
+  "players": [
+    {
+      "name": "Melchie Dumornay",
+      "url": "https://www.futbin.com/26/player/257/melchie-dumornay/market",
+      "enabled": true,
+      "notes": "Gold Rare - EA FC 26"
+    },
+    {
+      "name": "Ronaldo",
+      "url": "https://www.futbin.com/26/player/724/cristiano-ronaldo-dos-santos-aveiro/market",
+      "enabled": true,
+      "notes": ""
+    }
+  ],
+  "settings": {
+    "delay_between_requests": 3,
+    "headless_mode": false,
+    "save_to_csv": true,
+    "csv_filename": "futbin_prices.csv"
+  }
+}

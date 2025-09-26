@@ -2,19 +2,34 @@
 
 A Python-based web crawler for extracting player market data from Futbin.com player pages.
 
-**✅ WORKING VERSION: Use `futbin_crawler_working.py` for the fully functional crawler**
+**✅ WORKING VERSION: Successfully extracts data for multiple players using JSON configuration**
+
+## 🚀 Latest Test Results
+
+Successfully extracted data for:
+- **Melchie Dumornay**: Cheapest 54,000 | Avg BIN 60,556 | EA Avg 65,000
+- **Cristiano Ronaldo**: Cheapest 9,800 | Avg BIN 12,289 | EA Avg 13,125
 
 ## Features
 
-- Extracts key market data:
-  - **Cheapest Sale**: The lowest price the player is being sold for
-  - **Actual Price**: The current average BIN (Buy It Now) price
-  - **Average Price**: The EA average price
+### Core Capabilities
+- **Multi-player support** via JSON configuration
+- **Player management system** with interactive interface
+- **Automatic data extraction** for:
+  - Cheapest Sale price
+  - Average BIN (Buy It Now) price
+  - EA Average price
+- **CSV export** for spreadsheet integration
+- **JSON export** for API integration
+- **Configurable settings** (delays, headless mode, etc.)
+- **Cross-platform support** (Windows, Linux, macOS)
 
-- Supports both static and dynamic content extraction
-- Uses Selenium for JavaScript-rendered content
-- Includes error handling and fallback mechanisms
-- Returns data in structured JSON format
+### Technical Features
+- Uses `undetected-chromedriver` to bypass anti-bot protection
+- BeautifulSoup for HTML parsing
+- Selenium for JavaScript-rendered content
+- Robust error handling and logging
+- Rate limiting protection
 
 ## Installation
 
@@ -27,9 +42,27 @@ pip install -r requirements.txt
 
 3. Make sure you have Chrome browser installed (required for Selenium)
 
-## Usage
+## 🎯 Quick Start
 
-### Basic Usage (Use the Working Version)
+### Method 1: JSON Configuration (Recommended)
+
+The easiest way to use the crawler is with the JSON configuration system:
+
+1. **Add players to track** using the interactive manager:
+```bash
+python manage_players.py
+```
+
+2. **Run the crawler** to extract data for all enabled players:
+```bash
+python crawler_with_config.py
+```
+
+Your data will be saved to:
+- `futbin_prices.csv` - For spreadsheet import
+- `extraction_results.json` - Complete data with metadata
+
+### Method 2: Direct Usage (Single Player)
 
 ```python
 from futbin_crawler_working import FutbinCrawler
@@ -67,6 +100,99 @@ python spreadsheet_integration_example.py
 
 This demonstrates CSV export and shows how to integrate with Google Sheets.
 
+## 📋 Player Management System
+
+### Managing Players with `player_links.json`
+
+The crawler uses a JSON configuration file to manage multiple players:
+
+```json
+{
+  "players": [
+    {
+      "name": "Melchie Dumornay",
+      "url": "https://www.futbin.com/26/player/257/melchie-dumornay/market",
+      "enabled": true,
+      "notes": "Gold Rare - EA FC 26"
+    },
+    {
+      "name": "Ronaldo",
+      "url": "https://www.futbin.com/26/player/724/cristiano-ronaldo-dos-santos-aveiro/market",
+      "enabled": true,
+      "notes": ""
+    }
+  ],
+  "settings": {
+    "delay_between_requests": 3,
+    "headless_mode": false,
+    "save_to_csv": true,
+    "csv_filename": "futbin_prices.csv"
+  }
+}
+```
+
+### Using the Player Manager
+
+#### Interactive Mode
+```bash
+python manage_players.py
+```
+
+This opens an interactive menu where you can:
+- List all configured players
+- Add new players
+- Remove players
+- Enable/disable players
+- Update crawler settings
+
+#### Command-Line Mode
+```bash
+# List all players
+python manage_players.py list
+
+# Add a new player
+python manage_players.py add "Player Name" "https://futbin.com/url" "Notes"
+
+# Enable/disable a player
+python manage_players.py enable "Player Name"
+python manage_players.py disable "Player Name"
+
+# Remove a player
+python manage_players.py remove "Player Name"
+
+# View current settings
+python manage_players.py settings
+```
+
+### Running the Crawler with Configuration
+
+```bash
+python crawler_with_config.py
+```
+
+This will:
+1. Load all players from `player_links.json`
+2. Extract data for each **enabled** player
+3. Wait 3 seconds between requests (configurable)
+4. Save results to CSV and JSON files
+5. Display a summary report
+
+### Example Output
+
+```
+[1/2] Processing Melchie Dumornay...
+  ✅ Success!
+     Cheapest: 54,000
+     Avg BIN: 60,556
+     EA Avg: 65,000
+
+[2/2] Processing Ronaldo...
+  ✅ Success!
+     Cheapest: 9,800
+     Avg BIN: 12,289
+     EA Avg: 13,125
+```
+
 ## API Reference
 
 ### FutbinCrawler Class
@@ -94,11 +220,27 @@ Extracts market data from a Futbin player URL.
 #### `close()`
 Closes the Selenium driver and cleans up resources.
 
+## 📁 Project Files
+
+### Main Files
+- `crawler_with_config.py` - Main crawler using JSON configuration
+- `player_links.json` - Configuration file for player URLs and settings
+- `manage_players.py` - Interactive player management utility
+- `futbin_crawler_working.py` - Core crawler engine
+- `spreadsheet_integration_example.py` - CSV/spreadsheet integration examples
+
+### Output Files
+- `futbin_prices.csv` - Price data in CSV format
+- `extraction_results.json` - Complete extraction results with metadata
+
 ## Data Fields
 
 - **Cheapest Sale**: The lowest listed price for the player card
 - **Actual Price**: The current average BIN (Buy It Now) price - what players are actually selling for
 - **Average Price**: The EA-calculated average price across all platforms
+- **Timestamp**: Date and time of data extraction
+- **Player Name**: Name of the player
+- **Notes**: Any additional notes about the player
 
 ## Future Integration
 

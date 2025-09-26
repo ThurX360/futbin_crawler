@@ -1,0 +1,26 @@
+[
+  {
+    "success": true,
+    "url": "https://www.futbin.com/26/player/257/melchie-dumornay/market",
+    "data": {
+      "cheapest_sale": 54000,
+      "actual_price": 60556,
+      "average_price": 65000,
+      "player_name": "Melchie Dumornay",
+      "timestamp": "2025-09-26 15:02:43",
+      "notes": "Gold Rare - EA FC 26"
+    }
+  },
+  {
+    "success": true,
+    "url": "https://www.futbin.com/26/player/724/cristiano-ronaldo-dos-santos-aveiro/market",
+    "data": {
+      "cheapest_sale": 9800,
+      "actual_price": 12289,
+      "average_price": 13125,
+      "player_name": "Ronaldo",
+      "timestamp": "2025-09-26 15:02:53",
+      "notes": ""
+    }
+  }
+]
