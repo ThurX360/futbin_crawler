@@ -15,6 +15,7 @@ Automated price tracker for Futbin.com with Google Sheets integration.
 - **Cheapest Sale** - Lowest listed price
 - **Average BIN** - Buy It Now average
 - **EA Average** - EA's calculated price
+- **Player Metadata** - Card type (Gold, Rare, Promo, etc.), rarity, overall rating and position
 
 ## Installation
 
@@ -118,8 +119,13 @@ Educational purposes only.
 - **Cheapest Sale**: The lowest listed price for the player card
 - **Actual Price**: The current average BIN (Buy It Now) price - what players are actually selling for
 - **Average Price**: The EA-calculated average price across all platforms
+- **Player Name**: Name of the player as reported by Futbin
+- **Configured Name**: Friendly name stored in your configuration file or spreadsheet
+- **Card Type**: Display card type (e.g., Gold Rare, Promo, Icon)
+- **Card Rarity**: Additional rarity flag parsed from Futbin metadata
+- **Overall Rating**: Overall rating from the player item
+- **Position**: In-game position for the player item
 - **Timestamp**: Date and time of data extraction
-- **Player Name**: Name of the player
 - **Notes**: Any additional notes about the player
 
 ## Future Integration

@@ -20,7 +20,7 @@
     }
   ],
   "settings": {
-    "delay_between_requests": 3,
+    "delay_between_requests": 1,
     "headless_mode": false,
     "save_to_csv": true,
     "csv_filename": "futbin_prices.csv",
