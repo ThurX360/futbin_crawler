@@ -51,9 +51,16 @@ python manage_players.py
 # Quickly add a player by name (URL auto-detected)
 python manage_players.py add "Kylian Mbappé"
 
+# Import batches of players directly from Futbin listings (page range optional)
+python manage_players.py import_all 1 10 500
+
 # Run crawler with JSON config
 python crawler_with_config.py
 ```
+
+The optional arguments represent `START_PAGE`, `END_PAGE` and `MAX` players to import, so the
+example above will crawl Futbin pages 1 through 10 and stop after registering 500 new players. If
+you omit the last parameters the importer continues until Futbin stops returning results.
 
 
 ## 🔗 Google Sheets Integration Details
