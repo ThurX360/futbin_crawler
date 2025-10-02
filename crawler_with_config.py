@@ -83,13 +83,19 @@ class ConfiguredFutbinCrawler:
         
         try:
             result = self.crawler.extract(url)
-            
+
             # Add player name and timestamp to the result
             if result['success']:
-                result['data']['player_name'] = name
+                if not result['data'].get('player_name'):
+                    result['data']['player_name'] = name
+                result['data']['configured_name'] = name
                 result['data']['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 result['data']['notes'] = player_info.get('notes', '')
-            
+            else:
+                result['data']['player_name'] = result['data'].get('player_name') or name
+                result['data']['configured_name'] = name
+                result['data']['notes'] = player_info.get('notes', '')
+
             return result
             
         except Exception as e:
@@ -102,7 +108,13 @@ class ConfiguredFutbinCrawler:
                     'player_name': name,
                     'cheapest_sale': None,
                     'actual_price': None,
-                    'average_price': None
+                    'average_price': None,
+                    'card_type': None,
+                    'card_rarity': None,
+                    'overall_rating': None,
+                    'position': None,
+                    'configured_name': name,
+                    'notes': player_info.get('notes', '')
                 }
             }
     
@@ -120,7 +132,7 @@ class ConfiguredFutbinCrawler:
             return []
         
         results = []
-        delay = self.settings.get('delay_between_requests', 3)
+        delay = max(0, self.settings.get('delay_between_requests', 1))
         
         for i, player in enumerate(enabled_players, 1):
             print(f"\n[{i}/{len(enabled_players)}] Processing {player.get('name', 'Unknown')}...")
@@ -133,14 +145,24 @@ class ConfiguredFutbinCrawler:
             if result['success']:
                 data = result['data']
                 print(f"  ✅ Success!")
+                print(f"     Player: {data.get('player_name', 'Unknown')}")
+                if data.get('card_type') or data.get('card_rarity'):
+                    card_details = data.get('card_type') or data.get('card_rarity')
+                    if data.get('card_rarity') and data.get('card_type') and data['card_rarity'] not in data['card_type']:
+                        card_details = f"{data['card_type']} ({data['card_rarity']})"
+                    print(f"     Card: {card_details}")
+                if data.get('overall_rating') or data.get('position'):
+                    rating = data.get('overall_rating') or 'N/A'
+                    position = data.get('position') or 'N/A'
+                    print(f"     Rating/Position: {rating} / {position}")
                 print(f"     Cheapest: {data['cheapest_sale']:,}" if data['cheapest_sale'] else "     Cheapest: N/A")
                 print(f"     Avg BIN: {data['actual_price']:,}" if data['actual_price'] else "     Avg BIN: N/A")
                 print(f"     EA Avg: {data['average_price']:,}" if data['average_price'] else "     EA Avg: N/A")
             else:
                 print(f"  ❌ Failed: {result.get('error', 'Unknown error')}")
-            
+
             # Add delay between requests (except for last player)
-            if i < len(enabled_players):
+            if i < len(enabled_players) and delay:
                 logger.info(f"Waiting {delay} seconds before next request...")
                 time.sleep(delay)
         
@@ -166,7 +188,8 @@ class ConfiguredFutbinCrawler:
         
         # Define CSV headers
         headers = [
-            'timestamp', 'player_name', 'cheapest_sale', 
+            'timestamp', 'player_name', 'configured_name', 'card_type', 'card_rarity',
+            'overall_rating', 'position', 'cheapest_sale',
             'average_bin', 'ea_avg_price', 'notes', 'url'
         ]
         
@@ -185,6 +208,11 @@ class ConfiguredFutbinCrawler:
                     row = {
                         'timestamp': data.get('timestamp', ''),
                         'player_name': data.get('player_name', ''),
+                        'configured_name': data.get('configured_name', ''),
+                        'card_type': data.get('card_type', ''),
+                        'card_rarity': data.get('card_rarity', ''),
+                        'overall_rating': data.get('overall_rating', ''),
+                        'position': data.get('position', ''),
                         'cheapest_sale': data.get('cheapest_sale', ''),
                         'average_bin': data.get('actual_price', ''),
                         'ea_avg_price': data.get('average_price', ''),
@@ -234,6 +262,10 @@ class ConfiguredFutbinCrawler:
             for result in successful:
                 data = result['data']
                 print(f"\n{data['player_name']}:")
+                if data.get('card_type') or data.get('card_rarity'):
+                    print(f"  Card: {data.get('card_type') or data.get('card_rarity')}")
+                if data.get('overall_rating') or data.get('position'):
+                    print(f"  Rating/Position: {data.get('overall_rating', 'N/A')} / {data.get('position', 'N/A')}")
                 print(f"  Cheapest Sale: {data['cheapest_sale']:,}" if data['cheapest_sale'] else "  Cheapest Sale: N/A")
                 print(f"  Average BIN: {data['actual_price']:,}" if data['actual_price'] else "  Average BIN: N/A")
                 print(f"  EA Avg Price: {data['average_price']:,}" if data['average_price'] else "  EA Avg Price: N/A")
@@ -246,7 +278,8 @@ class ConfiguredFutbinCrawler:
             print("-"*40)
             
             for result in failed:
-                print(f"\n{result['data'].get('player_name', 'Unknown')}:")
+                failed_name = result['data'].get('player_name') or result['data'].get('configured_name') or 'Unknown'
+                print(f"\n{failed_name}:")
                 print(f"  Error: {result.get('error', 'Unknown error')}")
     
     def cleanup(self):

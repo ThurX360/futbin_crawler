@@ -5,8 +5,8 @@ Successfully extracts player market data from Futbin.com
 """
 
 import json
-import time
 import re
+import time
 from typing import Dict, Optional
 import logging
 
@@ -14,6 +14,7 @@ import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from bs4 import BeautifulSoup
 
 # Set up logging
@@ -104,6 +105,99 @@ class FutbinCrawler:
         
         return None
     
+    def _clean_text(self, value: Optional[str]) -> Optional[str]:
+        """Utility method to normalize whitespace in extracted text"""
+        if not value:
+            return None
+        cleaned = re.sub(r"\s+", " ", value).strip()
+        return cleaned or None
+
+    def _format_card_text(self, value: Optional[str]) -> Optional[str]:
+        """Format card related values like rarity/type into readable text"""
+        if not value:
+            return None
+
+        special_tokens = {"TOTW", "TOTS", "TOTY", "UCL", "OTW", "ICON", "HERO", "WC"}
+        cleaned = re.sub(r"[_-]+", " ", value).strip()
+        if not cleaned:
+            return None
+
+        formatted_tokens = []
+        for token in cleaned.split():
+            upper_token = token.upper()
+            if upper_token in special_tokens:
+                formatted_tokens.append(upper_token)
+            else:
+                formatted_tokens.append(token.capitalize())
+
+        return " ".join(formatted_tokens)
+
+    def _extract_player_metadata(self, soup: BeautifulSoup, page_source: str) -> Dict[str, Optional[str]]:
+        """Extract player metadata such as name, card type and rarity"""
+
+        metadata = {
+            'player_name': None,
+            'card_type': None,
+            'card_rarity': None,
+            'overall_rating': None,
+            'position': None
+        }
+
+        def update(field: str, value: Optional[str]):
+            if value and not metadata.get(field):
+                metadata[field] = value
+
+        # Attempt to extract player name from meta tags
+        title_meta = soup.find('meta', property='og:title') or soup.find('meta', attrs={'name': 'title'})
+        if title_meta and title_meta.get('content'):
+            title_content = title_meta['content'].split('|')[0]
+            update('player_name', self._clean_text(title_content))
+
+        # Fallback to header elements on the page
+        if not metadata['player_name']:
+            name_elem = soup.select_one('.player-name, .pcdisplay-name, h1')
+            if name_elem:
+                update('player_name', self._clean_text(name_elem.get_text()))
+
+        # Meta description often contains card type information
+        description_meta = soup.find('meta', property='og:description') or soup.find('meta', attrs={'name': 'description'})
+        description_text = description_meta.get('content') if description_meta else None
+
+        if description_text:
+            cleaned_description = self._clean_text(description_text)
+            if cleaned_description:
+                # Attempt to extract card related keywords from the description
+                card_match = re.search(r'(Gold|Silver|Bronze|Icon|Hero|Promo|Rare|Common|Special)[^.,;]*', cleaned_description, re.IGNORECASE)
+                if card_match:
+                    update('card_type', self._format_card_text(card_match.group(0)))
+
+                if not metadata['player_name']:
+                    name_match = re.match(r'([^,\-]+)', cleaned_description)
+                    if name_match:
+                        update('player_name', self._clean_text(name_match.group(1)))
+
+        # Search the raw page source for JSON data that contains card metadata
+        json_fields = {
+            'card_type': ['cardtype', 'cardType', 'version'],
+            'card_rarity': ['rarity'],
+            'overall_rating': ['rating'],
+            'position': ['position']
+        }
+
+        for field, keys in json_fields.items():
+            for key in keys:
+                match = re.search(rf'"{key}"\s*:\s*"?([^"\n\r]+?)"?[,}}]', page_source, re.IGNORECASE)
+                if match:
+                    value = match.group(1)
+                    if field in {'card_type', 'card_rarity'}:
+                        value = self._format_card_text(value)
+                    elif field == 'overall_rating':
+                        value = re.sub(r'[^0-9]', '', value)
+                    update(field, self._clean_text(value))
+                    break
+
+        return metadata
+
     def extract(self, url: str) -> Dict[str, any]:
         """
         Extract player market data from Futbin URL
@@ -127,20 +221,29 @@ class FutbinCrawler:
             logger.info(f"Loading URL: {url}")
             self.driver.get(url)
             
-            # Wait for page to load
+            # Wait for page body and dynamic market grid content to load
             wait = WebDriverWait(self.driver, self.timeout)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            time.sleep(3)  # Additional wait for dynamic content
-            
+
+            try:
+                wait.until(lambda driver: driver.find_elements(By.CSS_SELECTOR, 'div.market-grid-container'))
+            except TimeoutException:
+                logger.warning("Market grid did not load within timeout, continuing with available content")
+
             # Get page source and parse with BeautifulSoup
             page_source = self.driver.page_source
             soup = BeautifulSoup(page_source, 'html.parser')
-            
+
             # Initialize data dictionary
             data = {
                 'cheapest_sale': None,
                 'actual_price': None,  # Average BIN
-                'average_price': None   # EA Avg. Price
+                'average_price': None,  # EA Avg. Price
+                'player_name': None,
+                'card_type': None,
+                'card_rarity': None,
+                'overall_rating': None,
+                'position': None
             }
             
             # Find Cheapest Sale
@@ -200,9 +303,15 @@ class FutbinCrawler:
                                 data['average_price'] = self._parse_price(price_text)
                                 logger.info(f"Found EA Avg. Price (alt): {data['average_price']}")
             
-            # Check if we got any data
-            success = any(data.values())
-            
+            # Extract metadata such as player name and card type
+            metadata = self._extract_player_metadata(soup, page_source)
+            for key, value in metadata.items():
+                if value:
+                    data[key] = value
+
+            # Check if we got any price data (metadata alone does not count as success)
+            success = any(data[key] for key in ('cheapest_sale', 'actual_price', 'average_price'))
+
             result = {
                 'success': success,
                 'url': url,
@@ -224,7 +333,12 @@ class FutbinCrawler:
                 'data': {
                     'cheapest_sale': None,
                     'actual_price': None,
-                    'average_price': None
+                    'average_price': None,
+                    'player_name': None,
+                    'card_type': None,
+                    'card_rarity': None,
+                    'overall_rating': None,
+                    'position': None
                 }
             }
     

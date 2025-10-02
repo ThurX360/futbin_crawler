@@ -7,6 +7,11 @@
       "actual_price": 60630,
       "average_price": 65000,
       "player_name": "Melchie Dumornay",
+      "configured_name": "Melchie Dumornay",
+      "card_type": "Gold Rare",
+      "card_rarity": "Gold Rare",
+      "overall_rating": "83",
+      "position": "CAM",
       "timestamp": "2025-09-26 15:15:40",
       "notes": "Gold Rare - EA FC 26"
     }
@@ -19,6 +24,11 @@
       "actual_price": 12371,
       "average_price": 11750,
       "player_name": "Ronaldo",
+      "configured_name": "Ronaldo",
+      "card_type": "Gold Rare",
+      "card_rarity": "Gold Rare",
+      "overall_rating": "86",
+      "position": "ST",
       "timestamp": "2025-09-26 15:15:51",
       "notes": ""
     }
@@ -31,6 +41,11 @@
       "actual_price": 479000,
       "average_price": 166000,
       "player_name": "Isak",
+      "configured_name": "Isak",
+      "card_type": "Promo",
+      "card_rarity": "Special",
+      "overall_rating": "87",
+      "position": "ST",
       "timestamp": "2025-09-26 15:16:01",
       "notes": ""
     }
