@@ -16,8 +16,9 @@ class PlayerManager:
     """
     Manager for player links configuration
     """
-    
+
     FUTBIN_SEARCH_URL = "https://www.futbin.com/players?page=1&search={query}"
+    FUTBIN_PLAYERS_LIST_URL = "https://www.futbin.com/players?page={page}"
     USER_AGENT = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -81,7 +82,55 @@ class PlayerManager:
         except requests.RequestException as exc:
             print(f"❌ Error searching Futbin: {exc}")
             return []
-    
+
+    def fetch_players_page(self, page: int) -> List[dict]:
+        """Fetch a page of players from Futbin listings"""
+        list_url = self.FUTBIN_PLAYERS_LIST_URL.format(page=page)
+        headers = {"User-Agent": self.USER_AGENT}
+
+        try:
+            response = requests.get(list_url, headers=headers, timeout=20)
+            if response.status_code != 200:
+                print(f"❌ Futbin listing request failed (page {page}) with status {response.status_code}")
+                return []
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            rows = soup.select("table tbody tr")
+            players = []
+
+            for row in rows:
+                link = None
+                for anchor in row.find_all("a", href=True):
+                    if "/player/" in anchor["href"]:
+                        link = anchor
+                        break
+
+                if not link:
+                    continue
+
+                name = link.get_text(strip=True)
+                url = self._normalize_url(link["href"])
+
+                if not name or not url:
+                    continue
+
+                version = ""
+                version_cell = row.find("span", class_="players_club_nation")
+                if version_cell:
+                    version = version_cell.get_text(strip=True)
+
+                players.append({
+                    "name": name,
+                    "url": url,
+                    "notes": version
+                })
+
+            return players
+
+        except requests.RequestException as exc:
+            print(f"❌ Error loading Futbin page {page}: {exc}")
+            return []
+
     def load_config(self):
         """Load configuration from file"""
         try:
@@ -164,7 +213,7 @@ class PlayerManager:
         
         print(f"❌ Player not found: {name}")
         return False
-    
+
     def list_players(self):
         """List all players in configuration"""
         if not self.config['players']:
@@ -201,6 +250,54 @@ class PlayerManager:
         for key, value in self.config['settings'].items():
             print(f"{key}: {value}")
 
+    def bulk_import_players(self, start_page: int = 1, end_page: Optional[int] = None,
+                             max_players: Optional[int] = None, enable: bool = True):
+        """Import players from Futbin listing pages"""
+
+        existing_urls = {player['url'] for player in self.config['players']}
+        imported = 0
+        current_page = start_page
+
+        while True:
+            if end_page is not None and current_page > end_page:
+                break
+
+            print(f"📄 Fetching Futbin page {current_page}...")
+            players = self.fetch_players_page(current_page)
+            if not players:
+                print("⚠️ No players returned for this page; stopping import.")
+                break
+
+            added_this_page = 0
+            for player in players:
+                if player['url'] in existing_urls:
+                    continue
+
+                self.config['players'].append({
+                    "name": player['name'],
+                    "url": player['url'],
+                    "enabled": enable,
+                    "notes": player.get('notes', "")
+                })
+                existing_urls.add(player['url'])
+                imported += 1
+                added_this_page += 1
+
+                if max_players is not None and imported >= max_players:
+                    break
+
+            if max_players is not None and imported >= max_players:
+                break
+
+            print(f"   ↳ Added {added_this_page} new players")
+            current_page += 1
+
+        if imported:
+            self.save_config()
+            print(f"✅ Imported {imported} players from Futbin")
+        else:
+            print("⚠️ No new players were imported")
+
 
 def interactive_mode():
     """Interactive mode for managing players"""
@@ -216,10 +313,11 @@ def interactive_mode():
         print("4. Enable/Disable player")
         print("5. Show settings")
         print("6. Update setting")
-        print("7. Exit")
-        
-        choice = input("\nSelect option (1-7): ").strip()
-        
+        print("7. Bulk import from Futbin")
+        print("8. Exit")
+
+        choice = input("\nSelect option (1-8): ").strip()
+
         if choice == "1":
             manager.list_players()
         
@@ -289,13 +387,31 @@ def interactive_mode():
                 value = input(f"New value for {key} (true/false): ").strip().lower() == 'true'
             else:
                 value = input(f"New value for {key}: ").strip()
-            
+
             manager.update_settings(key, value)
-        
+
         elif choice == "7":
+            print("\n--- BULK IMPORT ---")
+            start_page = input("Start page (default 1): ").strip()
+            end_page = input("End page (leave blank for until empty): ").strip()
+            max_players = input("Maximum players to import (leave blank for unlimited): ").strip()
+            enable = input("Enable imported players? (y/n, default y): ").strip().lower() != 'n'
+
+            start_page_val = int(start_page) if start_page.isdigit() else 1
+            end_page_val = int(end_page) if end_page.isdigit() else None
+            max_players_val = int(max_players) if max_players.isdigit() else None
+
+            manager.bulk_import_players(
+                start_page=start_page_val,
+                end_page=end_page_val,
+                max_players=max_players_val,
+                enable=enable
+            )
+
+        elif choice == "8":
             print("Goodbye!")
             break
-        
+
         else:
             print("Invalid option")
 
@@ -340,6 +456,12 @@ def main():
         elif command == "settings":
             manager.show_settings()
         
+        elif command == "import_all":
+            start_page = int(sys.argv[2]) if len(sys.argv) >= 3 else 1
+            end_page = int(sys.argv[3]) if len(sys.argv) >= 4 else None
+            max_players = int(sys.argv[4]) if len(sys.argv) >= 5 else None
+            manager.bulk_import_players(start_page=start_page, end_page=end_page, max_players=max_players)
+
         else:
             print("Usage:")
             print("  python manage_players.py                    # Interactive mode")
@@ -350,6 +472,7 @@ def main():
             print("  python manage_players.py enable NAME")
             print("  python manage_players.py disable NAME")
             print("  python manage_players.py settings")
+            print("  python manage_players.py import_all [START_PAGE] [END_PAGE] [MAX]")
     
     else:
         # Interactive mode
