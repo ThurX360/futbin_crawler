@@ -48,6 +48,9 @@ python google_sheets_connector_v2.py YOUR_SPREADSHEET_ID
 # Manage players locally
 python manage_players.py
 
+# Quickly add a player by name (URL auto-detected)
+python manage_players.py add "Kylian Mbappé"
+
 # Run crawler with JSON config
 python crawler_with_config.py
 ```
