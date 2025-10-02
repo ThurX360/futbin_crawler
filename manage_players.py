@@ -5,7 +5,11 @@ Utility script to manage player links in the JSON configuration
 
 import json
 import sys
-from typing import Optional
+from typing import List, Optional
+
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
 
 
 class PlayerManager:
@@ -13,9 +17,70 @@ class PlayerManager:
     Manager for player links configuration
     """
     
+    FUTBIN_SEARCH_URL = "https://www.futbin.com/players?page=1&search={query}"
+    USER_AGENT = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
+    )
+
     def __init__(self, config_file: str = "player_links.json"):
         self.config_file = config_file
         self.load_config()
+
+    def _normalize_url(self, url: str) -> str:
+        """Ensure Futbin URLs are complete and point to the market tab"""
+        if not url:
+            return url
+
+        if not url.startswith("http"):
+            url = f"https://www.futbin.com{url}" if url.startswith("/") else f"https://www.futbin.com/{url}"
+
+        if not url.endswith("/market"):
+            url = url.rstrip("/") + "/market"
+
+        return url
+
+    def search_player_urls(self, name: str, limit: int = 5) -> List[dict]:
+        """Search Futbin for player URLs by name"""
+        if not name:
+            return []
+
+        search_url = self.FUTBIN_SEARCH_URL.format(query=quote_plus(name))
+        headers = {"User-Agent": self.USER_AGENT}
+
+        try:
+            response = requests.get(search_url, headers=headers, timeout=15)
+            if response.status_code != 200:
+                print(f"❌ Futbin search failed with status code {response.status_code}")
+                return []
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            rows = soup.select("table tbody tr")
+            results = []
+
+            for row in rows:
+                link = row.find("a", href=True)
+                if not link:
+                    continue
+
+                player_name = link.get_text(strip=True)
+                href = self._normalize_url(link["href"])
+
+                if href and player_name:
+                    results.append({"name": player_name, "url": href})
+
+                if len(results) >= limit:
+                    break
+
+            if not results:
+                print(f"❌ No players found for '{name}'")
+
+            return results
+
+        except requests.RequestException as exc:
+            print(f"❌ Error searching Futbin: {exc}")
+            return []
     
     def load_config(self):
         """Load configuration from file"""
@@ -41,8 +106,21 @@ class PlayerManager:
             json.dump(self.config, f, indent=2, ensure_ascii=False)
         print(f"✅ Configuration saved to {self.config_file}")
     
-    def add_player(self, name: str, url: str, notes: str = "", enabled: bool = True):
+    def add_player(self, name: str, url: Optional[str] = None, notes: str = "", enabled: bool = True):
         """Add a new player to configuration"""
+        if not url:
+            print(f"🔍 Searching Futbin for '{name}'...")
+            matches = self.search_player_urls(name)
+
+            if not matches:
+                print("❌ Could not find a matching player. Please provide the URL manually.")
+                return False
+
+            url = matches[0]["url"]
+            print(f"✅ Using URL for '{matches[0]['name']}': {url}")
+        else:
+            url = self._normalize_url(url)
+
         player = {
             "name": name,
             "url": url,
@@ -148,15 +226,38 @@ def interactive_mode():
         elif choice == "2":
             print("\n--- ADD PLAYER ---")
             name = input("Player name: ").strip()
-            url = input("Futbin URL: ").strip()
+            url = input("Futbin URL (leave blank to search): ").strip()
             notes = input("Notes (optional): ").strip()
             enabled = input("Enable player? (y/n): ").strip().lower() == 'y'
-            
+
             if name and url:
                 manager.add_player(name, url, notes, enabled)
+            elif name:
+                if not url:
+                    matches = manager.search_player_urls(name)
+                    if matches:
+                        print("\nSearch results:")
+                        for idx, match in enumerate(matches, 1):
+                            print(f"{idx}. {match['name']} - {match['url']}")
+
+                        selection = input("Select player (1-{}), or 0 to cancel: ".format(len(matches))).strip()
+
+                        if selection.isdigit():
+                            index = int(selection)
+                            if index == 0:
+                                print("❌ Cancelled")
+                                continue
+                            if 1 <= index <= len(matches):
+                                chosen = matches[index - 1]
+                                manager.add_player(chosen["name"], chosen["url"], notes, enabled)
+                                continue
+
+                        print("❌ Invalid selection")
+                    else:
+                        print("❌ Could not find a matching player")
             else:
-                print("❌ Name and URL are required")
-        
+                print("❌ Player name is required")
+
         elif choice == "3":
             manager.list_players()
             name = input("\nEnter player name to remove: ").strip()
@@ -210,12 +311,20 @@ def main():
         if command == "list":
             manager.list_players()
         
-        elif command == "add" and len(sys.argv) >= 4:
+        elif command == "add" and len(sys.argv) >= 3:
             name = sys.argv[2]
-            url = sys.argv[3]
-            notes = sys.argv[4] if len(sys.argv) > 4 else ""
+            url = sys.argv[3] if len(sys.argv) >= 4 else None
+            notes = sys.argv[4] if len(sys.argv) >= 5 else ""
             manager.add_player(name, url, notes)
-        
+
+        elif command == "search" and len(sys.argv) >= 3:
+            name = " ".join(sys.argv[2:])
+            results = manager.search_player_urls(name, limit=10)
+            if results:
+                print("\nSearch results:")
+                for idx, result in enumerate(results, 1):
+                    print(f"{idx}. {result['name']} -> {result['url']}")
+
         elif command == "remove" and len(sys.argv) >= 3:
             name = sys.argv[2]
             manager.remove_player(name)
@@ -235,7 +344,8 @@ def main():
             print("Usage:")
             print("  python manage_players.py                    # Interactive mode")
             print("  python manage_players.py list               # List all players")
-            print("  python manage_players.py add NAME URL [NOTES]")
+            print("  python manage_players.py add NAME [URL] [NOTES]")
+            print("  python manage_players.py search NAME        # Search for player URLs")
             print("  python manage_players.py remove NAME")
             print("  python manage_players.py enable NAME")
             print("  python manage_players.py disable NAME")
