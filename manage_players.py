@@ -4,6 +4,7 @@ Utility script to manage player links in the JSON configuration
 """
 
 import json
+import re
 import sys
 from typing import List, Optional
 
@@ -98,6 +99,16 @@ class PlayerManager:
             rows = soup.select("table tbody tr")
             players = []
 
+            def _has_rating_class(value):
+                if not value:
+                    return False
+                if isinstance(value, str):
+                    return "rating" in value.lower()
+                try:
+                    return any(isinstance(item, str) and "rating" in item.lower() for item in value)
+                except TypeError:
+                    return False
+
             for row in rows:
                 link = None
                 for anchor in row.find_all("a", href=True):
@@ -114,6 +125,20 @@ class PlayerManager:
                 if not name or not url:
                     continue
 
+                rating = None
+                # Try different selectors that Futbin may use for the overall rating column
+                rating_cell = (
+                    row.find("td", attrs={"data-title": "OVR"})
+                    or row.find("td", attrs={"data-title": "Rating"})
+                    or row.find("td", class_=_has_rating_class)
+                )
+                if rating_cell:
+                    rating_text = rating_cell.get_text(strip=True)
+                    if rating_text:
+                        match = re.search(r"\d+", rating_text)
+                        if match:
+                            rating = int(match.group())
+
                 version = ""
                 version_cell = row.find("span", class_="players_club_nation")
                 if version_cell:
@@ -122,6 +147,7 @@ class PlayerManager:
                 players.append({
                     "name": name,
                     "url": url,
+                    "rating": rating,
                     "notes": version
                 })
 
@@ -257,6 +283,8 @@ class PlayerManager:
         existing_urls = {player['url'] for player in self.config['players']}
         imported = 0
         current_page = start_page
+        min_rating = 85
+        skipped_low_rating = 0
 
         while True:
             if end_page is not None and current_page > end_page:
@@ -270,6 +298,11 @@ class PlayerManager:
 
             added_this_page = 0
             for player in players:
+                rating = player.get("rating")
+                if rating is None or rating < min_rating:
+                    skipped_low_rating += 1
+                    continue
+
                 if player['url'] in existing_urls:
                     continue
 
@@ -297,6 +330,9 @@ class PlayerManager:
             print(f"✅ Imported {imported} players from Futbin")
         else:
             print("⚠️ No new players were imported")
+
+        if skipped_low_rating:
+            print(f"ℹ️ Skipped {skipped_low_rating} players below {min_rating} OVR during import")
 
 
 def interactive_mode():
