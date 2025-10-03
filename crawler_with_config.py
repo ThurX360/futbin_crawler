@@ -118,7 +118,18 @@ class ConfiguredFutbinCrawler:
                 }
             }
     
-    def process_all_players(self) -> List[Dict]:
+    @staticmethod
+    def _format_price(value: Optional[int]) -> str:
+        """Format integer price values with thousands separator"""
+        if value is None:
+            return "N/A"
+
+        try:
+            return f"{int(value):,}"
+        except (TypeError, ValueError):
+            return "N/A"
+
+    def process_all_players(self, display_progress: bool = True) -> List[Dict]:
         """
         Process all enabled players from configuration
         
@@ -135,38 +146,180 @@ class ConfiguredFutbinCrawler:
         delay = max(0, self.settings.get('delay_between_requests', 1))
         
         for i, player in enumerate(enabled_players, 1):
-            print(f"\n[{i}/{len(enabled_players)}] Processing {player.get('name', 'Unknown')}...")
+            if display_progress:
+                print(f"\n[{i}/{len(enabled_players)}] Processing {player.get('name', 'Unknown')}...")
             
             # Extract data
             result = self.extract_player_data(player)
             results.append(result)
             
             # Display result
-            if result['success']:
-                data = result['data']
-                print(f"  ✅ Success!")
-                print(f"     Player: {data.get('player_name', 'Unknown')}")
-                if data.get('card_type') or data.get('card_rarity'):
-                    card_details = data.get('card_type') or data.get('card_rarity')
-                    if data.get('card_rarity') and data.get('card_type') and data['card_rarity'] not in data['card_type']:
-                        card_details = f"{data['card_type']} ({data['card_rarity']})"
-                    print(f"     Card: {card_details}")
-                if data.get('overall_rating') or data.get('position'):
-                    rating = data.get('overall_rating') or 'N/A'
-                    position = data.get('position') or 'N/A'
-                    print(f"     Rating/Position: {rating} / {position}")
-                print(f"     Cheapest: {data['cheapest_sale']:,}" if data['cheapest_sale'] else "     Cheapest: N/A")
-                print(f"     Avg BIN: {data['actual_price']:,}" if data['actual_price'] else "     Avg BIN: N/A")
-                print(f"     EA Avg: {data['average_price']:,}" if data['average_price'] else "     EA Avg: N/A")
-            else:
-                print(f"  ❌ Failed: {result.get('error', 'Unknown error')}")
+            if display_progress:
+                if result['success']:
+                    data = result['data']
+                    print(f"  ✅ Success!")
+                    print(f"     Player: {data.get('player_name', 'Unknown')}")
+                    if data.get('card_type') or data.get('card_rarity'):
+                        card_details = data.get('card_type') or data.get('card_rarity')
+                        if data.get('card_rarity') and data.get('card_type') and data['card_rarity'] not in data['card_type']:
+                            card_details = f"{data['card_type']} ({data['card_rarity']})"
+                        print(f"     Card: {card_details}")
+                    if data.get('overall_rating') or data.get('position'):
+                        rating = data.get('overall_rating') or 'N/A'
+                        position = data.get('position') or 'N/A'
+                        print(f"     Rating/Position: {rating} / {position}")
+                    print(f"     Cheapest: {self._format_price(data.get('cheapest_sale'))}")
+                    print(f"     Avg BIN: {self._format_price(data.get('actual_price'))}")
+                    print(f"     EA Avg: {self._format_price(data.get('average_price'))}")
+                else:
+                    print(f"  ❌ Failed: {result.get('error', 'Unknown error')}")
 
             # Add delay between requests (except for last player)
             if i < len(enabled_players) and delay:
-                logger.info(f"Waiting {delay} seconds before next request...")
+                if display_progress:
+                    logger.info(f"Waiting {delay} seconds before next request...")
                 time.sleep(delay)
-        
+
         return results
+
+    def monitor_players(self) -> List[Dict]:
+        """Continuously monitor enabled players and highlight buying opportunities"""
+
+        enabled_players = self.get_enabled_players()
+
+        if not enabled_players:
+            logger.warning("No enabled players found in configuration!")
+            return []
+
+        interval = max(10, int(self.settings.get('monitoring_interval_seconds', 300)))
+        drop_threshold = float(self.settings.get('price_drop_threshold', 0.1))
+        profit_margin = float(self.settings.get('target_profit_margin', 0.08))
+
+        print("\n" + "=" * 70)
+        print("CONTINUOUS PRICE MONITORING")
+        print("=" * 70)
+        print("Press Ctrl+C to stop monitoring.")
+        print(f"Tracking {len(enabled_players)} players every {interval} seconds.")
+        print(f"Highlighting drops ≥ {drop_threshold * 100:.1f}% and profit margins ≥ {profit_margin * 100:.1f}%.")
+
+        previous_prices: Dict[str, Dict[str, Optional[int]]] = {}
+        iteration = 1
+        last_results: List[Dict] = []
+
+        try:
+            while True:
+                cycle_started = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print("\n" + "-" * 70)
+                print(f"🔄 Cycle {iteration} started at {cycle_started}")
+
+                results = self.process_all_players(display_progress=False)
+                last_results = results
+
+                failures = [r for r in results if not r['success']]
+
+                recommendations = []
+
+                for result in results:
+                    url = result.get('url', '')
+                    data = result.get('data', {}) or {}
+                    name = data.get('configured_name') or data.get('player_name') or 'Unknown Player'
+
+                    if not result['success']:
+                        error_msg = result.get('error', 'Unknown error')
+                        print(f"  ⚠️ {name}: Failed to refresh data ({error_msg})")
+                        continue
+
+                    cheapest = data.get('cheapest_sale')
+                    avg_bin = data.get('actual_price')
+                    ea_avg = data.get('average_price')
+                    reference_price = next((price for price in (avg_bin, ea_avg) if price), None)
+
+                    previous_entry = previous_prices.get(url)
+                    previous_price = previous_entry.get('cheapest') if previous_entry else None
+
+                    change_symbol = "="
+                    change_text = "No change"
+                    drop_pct = None
+
+                    if cheapest and previous_price:
+                        if cheapest < previous_price:
+                            drop_pct = (previous_price - cheapest) / previous_price
+                            change_symbol = "↓"
+                            change_text = f"Down {drop_pct * 100:.1f}% ({self._format_price(previous_price)} → {self._format_price(cheapest)})"
+                        elif cheapest > previous_price:
+                            increase_pct = (cheapest - previous_price) / previous_price
+                            change_symbol = "↑"
+                            change_text = f"Up {increase_pct * 100:.1f}% ({self._format_price(previous_price)} → {self._format_price(cheapest)})"
+                        else:
+                            change_text = "Unchanged"
+
+                    print(f"  {change_symbol} {name}")
+                    print(f"     Cheapest: {self._format_price(cheapest)} | Avg BIN: {self._format_price(avg_bin)} | EA Avg: {self._format_price(ea_avg)}")
+                    if previous_price:
+                        print(f"     Trend: {change_text}")
+
+                    margin = None
+                    potential_profit = None
+                    if cheapest and reference_price and reference_price > 0:
+                        potential_profit = reference_price - cheapest
+                        if potential_profit > 0:
+                            margin = potential_profit / reference_price
+
+                    if margin and margin >= profit_margin:
+                        recommendations.append({
+                            'name': name,
+                            'cheapest': cheapest,
+                            'reference_price': reference_price,
+                            'margin': margin,
+                            'drop_pct': drop_pct,
+                            'url': url,
+                            'reference_label': 'Avg BIN' if reference_price == avg_bin else 'EA Avg'
+                        })
+                    elif drop_pct and drop_pct >= drop_threshold and potential_profit and potential_profit > 0:
+                        recommendations.append({
+                            'name': name,
+                            'cheapest': cheapest,
+                            'reference_price': reference_price,
+                            'margin': margin,
+                            'drop_pct': drop_pct,
+                            'url': url,
+                            'reference_label': 'Avg BIN' if reference_price == avg_bin else 'EA Avg'
+                        })
+
+                    if cheapest:
+                        previous_prices[url] = {
+                            'cheapest': cheapest,
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
+
+                if failures:
+                    print(f"\n  ⚠️ {len(failures)} player(s) failed in this cycle. See logs for details.")
+
+                if recommendations:
+                    print("\n  💡 Potential buy opportunities detected:")
+                    recommendations.sort(key=lambda x: (x['margin'] or 0, x['drop_pct'] or 0), reverse=True)
+                    for rec in recommendations:
+                        margin_text = f"{rec['margin'] * 100:.1f}%" if rec['margin'] is not None else "N/A"
+                        drop_text = f" | Drop {rec['drop_pct'] * 100:.1f}%" if rec['drop_pct'] is not None else ""
+                        ref_price = self._format_price(rec['reference_price'])
+                        print(f"   - {rec['name']}: {self._format_price(rec['cheapest'])} vs {rec['reference_label']} {ref_price} (Margin {margin_text}{drop_text})")
+                        if rec['url']:
+                            print(f"     URL: {rec['url']}")
+                else:
+                    print("\n  No buy signals this cycle based on configured thresholds.")
+
+                print(f"\n✅ Cycle {iteration} complete. Next check in {interval} seconds...")
+                iteration += 1
+
+                time.sleep(interval)
+
+        except KeyboardInterrupt:
+            print("\n\n🛑 Monitoring stopped by user. Preparing final summary...")
+        except Exception as e:
+            logger.error(f"Monitoring stopped due to error: {e}")
+            print(f"\n❌ Monitoring stopped due to error: {e}")
+
+        return last_results
     
     def save_to_csv(self, results: List[Dict], filename: Optional[str] = None):
         """
@@ -300,25 +453,47 @@ def main():
         # Initialize crawler with config
         crawler = ConfiguredFutbinCrawler("player_links.json")
         
-        # Process all enabled players
-        results = crawler.process_all_players()
-        
-        # Generate report
-        crawler.generate_report(results)
-        
-        # Save results if configured
-        if crawler.settings.get('save_to_csv', True):
-            crawler.save_to_csv(results)
-        
-        # Also save to JSON for complete data
-        crawler.save_to_json(results)
-        
-        print("\n" + "="*70)
-        print("✅ Processing complete!")
-        print(f"Results saved to:")
-        print(f"  - {crawler.settings.get('csv_filename', 'futbin_prices.csv')} (CSV)")
-        print(f"  - extraction_results.json (JSON)")
-        print("="*70)
+        if crawler.settings.get('continuous_monitoring', False):
+            last_results = crawler.monitor_players()
+
+            if last_results:
+                if crawler.settings.get('save_to_csv', True):
+                    crawler.save_to_csv(last_results)
+
+                crawler.save_to_json(last_results)
+                crawler.generate_report(last_results)
+
+                print("\n" + "="*70)
+                print("✅ Monitoring session ended")
+                print(f"Latest snapshot saved to:")
+                print(f"  - {crawler.settings.get('csv_filename', 'futbin_prices.csv')} (CSV)")
+                print(f"  - extraction_results.json (JSON)")
+                print("="*70)
+            else:
+                print("\n" + "="*70)
+                print("⚠️ Monitoring session ended without successful data capture.")
+                print("Check your configuration and try again.")
+                print("="*70)
+        else:
+            # Process all enabled players
+            results = crawler.process_all_players()
+
+            # Generate report
+            crawler.generate_report(results)
+
+            # Save results if configured
+            if crawler.settings.get('save_to_csv', True):
+                crawler.save_to_csv(results)
+
+            # Also save to JSON for complete data
+            crawler.save_to_json(results)
+
+            print("\n" + "="*70)
+            print("✅ Processing complete!")
+            print(f"Results saved to:")
+            print(f"  - {crawler.settings.get('csv_filename', 'futbin_prices.csv')} (CSV)")
+            print(f"  - extraction_results.json (JSON)")
+            print("="*70)
         
     except Exception as e:
         logger.error(f"Fatal error: {e}")
