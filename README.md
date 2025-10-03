@@ -63,6 +63,29 @@ The optional arguments represent `START_PAGE`, `END_PAGE` and `MAX` players to i
 example above will crawl Futbin pages 1 through 10 and stop after registering 500 new players. If
 you omit the last parameters the importer continues until Futbin stops returning results.
 
+#### Continuous Monitoring Mode
+
+Add the following keys to the `settings` block in `player_links.json` to keep the crawler running
+indefinitely and highlight buying opportunities as prices move:
+
+```json
+  "settings": {
+    ...,
+    "continuous_monitoring": true,
+    "monitoring_interval_seconds": 300,
+    "price_drop_threshold": 0.10,
+    "target_profit_margin": 0.08
+  }
+```
+
+- `continuous_monitoring` – enables the always-on loop.
+- `monitoring_interval_seconds` – wait time between full scans (minimum 10 seconds).
+- `price_drop_threshold` – minimum relative drop versus the previous cycle to trigger a signal (e.g. `0.10` = 10%).
+- `target_profit_margin` – desired margin between the cheapest listing and the reference price (Average BIN or EA Avg) to flag a card as a buy.
+
+Run `python crawler_with_config.py` and the script will keep cycling until you press **Ctrl+C**.
+A snapshot of the latest prices and a summary report are stored when you exit.
+
 
 ## 🔗 Google Sheets Integration Details
 
